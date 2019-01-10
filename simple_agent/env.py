@@ -4,7 +4,7 @@ import numpy as np
 Broodwar = cybw.Broodwar
 
 FEATURE_COUNT = 4
-FLEE_FRAME = 10
+FLEE_FRAME = 12
 DISTANCE_INDEX_N = 4
 HEALTH_INDEX_N = 4
 
@@ -72,6 +72,7 @@ class Environment:
                 agentHealthSum += u.getHitPoints()
         return (agentHealthSum - enemyHealthSum)
 
+
     def getCurrentState(self):
         indices = [0 for _ in range(FEATURE_COUNT)]
         indices[0] = self.getCooldownIndex()
@@ -110,6 +111,9 @@ class Environment:
         for enemy in Broodwar.enemy().getUnits():
             if (weakestEnemy == None or enemy.getHitPoints() < weakestEnemy.getHitPoints()):
                 weakestEnemy = enemy
+            elif (weakestEnemy.getHitPoints() == enemy.getHitPoints() and
+                  self.singleAgent.getDistance(weakestEnemy) > self.singleAgent.getDistance(enemy)):
+                weakestEnemy = enemy
         return weakestEnemy
 
     def getWeakestWithinRange(self):
@@ -117,14 +121,17 @@ class Environment:
         for enemy in self.singleAgent.getUnitsInRadius(self.singleAgent.getType().groundWeapon().maxRange()):
             if (weakest == None or weakest.getHitPoints() > enemy.getHitPoints()):
                 weakest = enemy
+            elif(weakest.getHitPoints() == enemy.getHitPoints() and
+                 self.singleAgent.getDistance(weakest) > self.singleAgent.getDistance(enemy)):
+                weakest = enemy
         return weakest
 
     def getEnemyCount(self):
         return len(self.singleAgent.getUnitsInRadius(self.singleAgent.getType().groundWeapon().maxRange()))
 
     def getHealthIndex(self):
-        index = self.singleAgent.getHitPoints() * HEALTH_INDEX_N / 80
-        return min(index, HEALTH_INDEX_N - 1)
+        index = self.singleAgent.getHitPoints() * HEALTH_INDEX_N // 80
+        return clamp(index, 0, HEALTH_INDEX_N - 1)
 
     def getFleePosition(self):
         avgx = 0
@@ -145,8 +152,11 @@ class Environment:
             return self.singleAgent.getPosition()
 
         length = math.sqrt(avgx * avgx + avgy * avgy)
-        vecx = avgx / length
-        vecy = avgy / length
+        if(length > 0):
+            vecx = avgx / length
+            vecy = avgy / length
+        else:
+            print("LENGTH IS ZERO 11")
 
         leftR = max(0, self.margin - self.singleAgent.getPosition().getX()) / self.margin
         rightR = max(0, self.margin - (Broodwar.mapWidth() * 32 - self.singleAgent.getPosition().getX())) / self.margin
@@ -157,8 +167,11 @@ class Environment:
         vecy = vecy + (upR - downR) * self.repulsePower
 
         length = math.sqrt(vecx * vecx + vecy * vecy)
-        vecx = vecx / length
-        vecy = vecy / length
+        if(length > 0):
+            vecx = vecx / length
+            vecy = vecy / length
+        else:
+            print("LENGTH IS ZERO 22")
 
         npx = self.singleAgent.getPosition().getX() + int(32 * vecx * self.FLEE_COEFF)
         npy = self.singleAgent.getPosition().getY() + int(32 * vecy * self.FLEE_COEFF)
@@ -168,8 +181,8 @@ class Environment:
         return cybw.Position(npx, npy)
 
     def applyAction(self, action):
-        if(self.done):
-            return
+        # if(self.done):
+        #     return
         if(action is 0):
             weakestUnit = self.getWeakestWithinRange()
             if(weakestUnit is not None):
@@ -193,7 +206,9 @@ class Environment:
         self.isActionFinished = False
 
     def doAction(self):
-        assert self.current_action is 0 or self.current_action is 1
+
+        assert self.current_action == 0 or self.current_action == 1
+
         if self.current_action is 0:
             if self.lastStartAttack:
                 self.isActionFinished = True
@@ -208,7 +223,7 @@ class Environment:
                 self.flee_counter -= 1
 
     def check_game_done(self):
-        self.done = len(Broodwar.enemy().getUnits()) is 0
+        self.done = (len(Broodwar.enemy().getUnits()) == 0) or (len(Broodwar.self().getUnits())==0)
 
     def draw_circles(self):
         Broodwar.drawCircleMap(self.singleAgent.getPosition(), self.singleAgent.getType().groundWeapon().maxRange(),

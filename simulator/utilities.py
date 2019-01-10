@@ -1,6 +1,7 @@
 import random
 import math
 import datetime
+import re
 
 def clamp(x, x_min, x_max):
     return x_min if x < x_min else (x_max if x > x_max else x)
@@ -21,7 +22,7 @@ def importTable(fileName):
     table = []
     with open(fileName) as f:
         for line in f:
-            line_splited = line.split(' ')
+            line_splited = re.split(' |\t|\n',line)
             table.append([float(line_splited[0]), float(line_splited[1])])
     return table
 
@@ -35,8 +36,8 @@ def exportTable(table, algorithm, iterate, fileName = ''):
         for i in range(len(table)):
             for j in range(len(table[0])):
                 if j is len(table[0])-1:
-                    f.write("%d\n" % (table[i][j]))
+                    f.write("%f\n" % (table[i][j]))
                 else:
-                    f.write("%d\t" % (table[i][j]))
+                    f.write("%f\t" % (table[i][j]))
 
     print("export finished")

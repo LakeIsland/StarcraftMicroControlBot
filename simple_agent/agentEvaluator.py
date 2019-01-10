@@ -1,7 +1,7 @@
 import cybw
 from time import sleep
-from env import Environment
-from agent import Agent
+from simple_agent.env import Environment
+from simple_agent.agent import Agent
 client = cybw.BWAPIClient
 Broodwar = cybw.Broodwar
 
@@ -49,17 +49,18 @@ class AgentEvaluator:
                         if e.isWinner():
                             winEpisode += 1
 
-                if (env.isActionFinished):
-                    state = env.getCurrentState()
-                    action = agent.getAction(state, JUST_FOR_TEST=True)
-                    env.applyAction(action)
-                    step += 1
-                else:
-                    env.doAction()
+                if(not env.done):
+                    if (env.isActionFinished):
+                        state = env.getCurrentState()
+                        action = agent.getAction(state, JUST_FOR_TEST=True)
+                        env.applyAction(action)
+                        step += 1
+                    else:
+                        env.doAction()
 
-                if (self.visualize):
-                    env.draw_circles()
-                env.check_game_done()
+                    if (self.visualize):
+                        env.draw_circles()
+                    env.check_game_done()
 
                 client.update()
 

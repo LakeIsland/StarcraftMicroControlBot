@@ -1,11 +1,10 @@
-import random
-from env import Environment
+from simple_agent.env import Environment
 from utilities import *
 
 class Agent:
     def __init__(self, actions, state_number, fileName = '', learning_rate = 0.05, discount_factor = 0.9, epsilon0 = 0.9):
         if(fileName is ''):
-            self.q_table = [[0] * len(actions) for _ in range(state_number)]
+            self.q_table = [[0.0] * len(actions) for _ in range(state_number)]
             assert len(self.q_table) is Environment.state_size
         else:
             self.q_table = importTable(fileName)
