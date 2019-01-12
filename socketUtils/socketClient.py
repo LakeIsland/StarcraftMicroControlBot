@@ -12,12 +12,14 @@ class socketClient:
     def sendMessage(self, tag, msg):
         packet = pickle.dumps([tag, msg])
         self.s.send(packet)
+        #print("SEND",tag,msg)
 
     def receiveMessage(self):
         data = pickle.loads(self.s.recv(1024))
         tag = data[0]
         msg = data[1]
         #print(" ".join([str(x) for x in data]))
+        #print("RECEIVE", tag, msg)
         return tag, msg
 
     # def sendMessage(self, msg):

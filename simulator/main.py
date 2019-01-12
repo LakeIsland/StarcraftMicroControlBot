@@ -1,5 +1,6 @@
 from deep_sarsa.deep_sarsa_agent_trainer import DeepSARSAAgentTrainer
 from socketUtils.socketClient import *
+from deep_q_agent_trainer import DeepQAgentTrainer
 from agentTrainer import AgentTrainer
 from agentEvaluator import AgentEvaluator
 import sys, os
@@ -20,17 +21,40 @@ def testSimpleOne():
                             visualize=True,very_fast=False)
     tester.evaluate()
 
+def trainDeepSarsa():
+    s = socketClient()
+    s.accessToServer()
+    trainer = DeepSARSAAgentTrainer(s, very_fast=True, visualize = False, max_iterate=500,
+                                    file_to_load = '../modeldata/_deep_sarsa_500_times_2019_01_12_12_29.h5',
+                                    mode='train',epsilon_decrease='LINEAR')
+    trainer.train()
+
+def testDeepSarsa():
+    s = socketClient()
+    s.accessToServer()
+    trainer = DeepSARSAAgentTrainer(s, very_fast=True, visualize = False,
+                                    max_iterate=100, mode = 'evaluate',
+                                    file_to_load = '../modeldata/_deep_sarsa_500_times_2019_01_12_13_17.h5',
+                                    )
+    trainer.train()
+
+def trainDQN():
+    s = socketClient()
+    s.accessToServer()
+    trainer = DeepQAgentTrainer(s, very_fast=True, visualize=False, maxIterate=500)
+    trainer.train()
+
 if __name__ == "__main__":
     # eval = AgentEvaluator(fileName = "../q_table_test.txt")
     # eval.evaluate()
 
     #trainSimpleOne()
-    testSimpleOne()
+    #testSimpleOne()
 
-    # s = socketClient()
-    # s.accessToServer()
-    # trainer = DeepSARSAAgentTrainer(s, very_fast=True, visualize = False, maxIterate=500)
-    # trainer.train()
+    #trainDQN()
+    #trainDeepSarsa()
+
+    testDeepSarsa()
 
 # def decoding(a):
 #     a = a

@@ -103,11 +103,11 @@ class AgentTrainer:
                 client.update()
 
             episode += 1
-            if (self.epsilon_decrease is "LINEAR"):
+            if (self.epsilon_decrease == "LINEAR"):
                 agent.epsilon = self.epsilon0 * (self.maxIterate - episode)/self.maxIterate
-            elif(self.epsilon_decrease is "EXPONENTIAL"):
+            elif(self.epsilon_decrease == "EXPONENTIAL"):
                 agent.epsilon *= self.epsilon_decay_rate
-            elif(self.epsilon_decrease is "INVERSE_SQRT"):
+            elif(self.epsilon_decrease == "INVERSE_SQRT"):
                 agent.epsilon = self.epsilon0 / math.sqrt(1 + episode)
 
         exportTable(agent.q_table, self.algorithm, self.maxIterate)

@@ -20,5 +20,5 @@ class DeepSARSAEnvironment(Environment):
             distance = 100000
         else:
             distance = self.singleAgent.getDistance(closestUnit)
-        normalized_dist = clamp(distance / 32, 0, 1)
+        normalized_dist = clamp(distance / 48, 0, 1)
         return normalized_dist

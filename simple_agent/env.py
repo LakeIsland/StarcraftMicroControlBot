@@ -52,7 +52,7 @@ class Environment:
         enemyHealthSum = 0
         agentHealthSum = 0
         for u in Broodwar.getAllUnits():
-            if (u.getPlayer().getID() is not Broodwar.self().getID()):
+            if u.getPlayer().getID() is not Broodwar.self().getID():
                 enemyHealthSum += u.getHitPoints()
             else:
                 agentHealthSum += u.getHitPoints()
