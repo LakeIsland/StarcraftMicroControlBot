@@ -72,7 +72,7 @@ class DeepSARSAAgentTrainer:
             last_state = None
             last_action = -1
             step = 0
-            #self.socket.sendMessage("RRRRRRRRRRRRRRR",[4234234])
+            
             while Broodwar.isInGame():
                 events = Broodwar.getEvents()
                 for e in events:

@@ -37,9 +37,18 @@ class AgentEvaluator:
                 Environment.initialize()
                 agent = Agent([0, 1], Environment.state_size, self.fileName)
 
+
             Broodwar.sendText("black sheep wall")
             env.reset()
             step = 0
+
+            #print(Broodwar.isWalkable(env.singleAgent.getPosition()), 'walkable Position')
+            print(Broodwar.isWalkable(9, 9), 'walkable xy')
+            print(Broodwar.isWalkable(cybw.WalkPosition(env.singleAgent.getPosition())), 'walkable xy')
+
+            for e in Broodwar.enemy().getUnits():
+                print(env.singleAgent.getPosition().x, " Position")
+
             while Broodwar.isInGame():
                 events = Broodwar.getEvents()
                 for e in events:

@@ -4,6 +4,8 @@ from deep_q_agent_trainer import DeepQAgentTrainer
 from agentTrainer import AgentTrainer
 from agentEvaluator import AgentEvaluator
 import sys, os
+from multi_agent.multi_agent_trainer import MultiAgentTrainer
+import time, datetime
 
 def trainSimpleOne():
     trainer = AgentTrainer(maxIterate=1000, epsilon_decrease="LINEAR", algorithm="Q_LEARNING")
@@ -44,17 +46,56 @@ def trainDQN():
     trainer = DeepQAgentTrainer(s, very_fast=True, visualize=False, maxIterate=500)
     trainer.train()
 
+def train_multi_agent():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
+                                #file_to_load='../modeldata/deep_sarsa_3G_4Z_500_times_2019_01_27_14_27.h5',
+                                mode='train',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100],
+                                export_per=250)
+    trainer.train()
+
+
+def test_multi_agent():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa',very_fast=False, visualize = True, max_iterate=100,
+                                file_to_load='../modeldata/deep_sarsa_3G_4Z_5000_times_2019_01_28_07_33.h5',
+                                mode='evaluate',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100])
+    trainer.train()
+
+
+def train_multi_agent_dqn():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DQN', very_fast=True, visualize = False, max_iterate=5000,
+                                #file_to_load='../modeldata/deep_q_3G_3Z_500_times_2019_01_26_23_12.h5',
+                                mode='train',epsilon_decrease='LINEAR',map_name='3G_3Z',layers=[100,100],
+                                export_per=250)
+    trainer.train()
+
+def test_multi_agent_dqn():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DQN', very_fast=False, visualize = True, max_iterate=500,
+                                file_to_load='../modeldata/deep_q_3G_3Z_5000_times_2019_01_27_08_00.h5',
+                                mode='evaluate',epsilon_decrease='LINEAR',map_name='3G_3Z',layers=[100,100])
+    trainer.train()
+
 if __name__ == "__main__":
     # eval = AgentEvaluator(fileName = "../q_table_test.txt")
     # eval.evaluate()
-
+    start_time = time.time()
+    test_multi_agent()
+    print(str(datetime.timedelta(seconds=time.time()-start_time)))
     #trainSimpleOne()
     #testSimpleOne()
 
     #trainDQN()
     #trainDeepSarsa()
 
-    testDeepSarsa()
+    #testDeepSarsa()
+
 
 # def decoding(a):
 #     a = a
