@@ -44,6 +44,7 @@ def get_terrain_distance(unit, direction):
             return d
         else:
             d += 20
+
     return d
 
 def get_state_info(own):
@@ -70,8 +71,8 @@ def get_state_info(own):
             continue
         idx = direction_to_index(eu.getPosition() - own.getPosition())
         nd = distance_normalized(eu.getDistance(own), sight_range)
-        own_sum_info[idx] += nd
-        own_max_info[idx] = max(nd, own_max_info[idx])
+        enemy_sum_info[idx] += nd
+        enemy_max_info[idx] = max(nd, enemy_max_info[idx])
 
     terrain_info = [0 for _ in range(DIM_DIRECTION)]
     for i in range(DIM_DIRECTION):
@@ -105,8 +106,8 @@ def get_closest_unit(unit):
 
 def get_attack_enemy_unit(unit):
     target = getWeakestWithinRange(unit)
-    if target is None:
-        target = get_closest_unit(unit)
+    # if target is None:
+    #     target = get_closest_unit(unit)
     return target
 
 def apply_action(unit, action):
@@ -116,7 +117,6 @@ def apply_action(unit, action):
             unit.stop()
             unit.attack(target)
         else:
-
             unit.holdPosition()
 
     else:
@@ -133,7 +133,7 @@ def reward_attack(unit, last_hitpoint, last_cool_down):
     if last_cool_down < unit.getGroundWeaponCooldown():
         r += unit.getType().groundWeapon().damageAmount() * unit.getType().groundWeapon().damageFactor()
     if unit.getHitPoints() + unit.getShields() < last_hitpoint:
-        r -= 1.28 * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
+        r -= (160 * 4) / (125 * 3) * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
     return r * 0.1
 
 def reward_destroy():
@@ -143,7 +143,7 @@ def reward_destroy():
     lastAgentCount = agentCount
     return reward
 
-def reward_move(unit, last_state, last_action):
+def reward_move(unit, last_state, last_action, last_position):
     if len(Broodwar.enemy().getUnits()) == 0:
         ours = 0
         for u in unit.getUnitsInRadius(unit.getType().sightRange()):
@@ -153,21 +153,38 @@ def reward_move(unit, last_state, last_action):
             return 0
         last_own_max_info = last_state[10:10+DIM_DIRECTION]
         if last_action == DIM_DIRECTION or last_own_max_info[last_action] < 0.01:
-            return -0.5
+            return -5
         else:
             return 0
 
     else:
         enemies = 0
+        reward = 0
         for u in unit.getUnitsInRadius(unit.getType().sightRange()):
             if u.getPlayer().getID() != Broodwar.self().getID():
                 enemies += 1
+
         if enemies == 0:
             last_enemy_max_info = last_state[26:26 + DIM_DIRECTION]
             if last_action == DIM_DIRECTION or last_enemy_max_info[last_action] < 0.01:
-                return -0.5
-            else:
-                return 0
+                reward -= 0.5
+
+        # cannot move
+        if last_action < DIM_DIRECTION:
+            if unit.getPosition() == last_position:
+                reward -= 0.5
+
+            # own_unit = last_state[10:18]
+            # ene_unit = last_state[26:34]
+            # terrains = last_state[34:42]
+            # if terrains[last_action] > 0.7 or own_unit[last_action] > 0.99 or ene_unit[last_action] > 0.9:
+            #     reward -= 2
+                #print("Last action was", last_action)
+                #print("Terrain:", terrains[last_action], "Own:", own_unit[last_action], "Ene:", ene_unit[last_action])
+                #print("CANNOT MOVE")
+
+        return reward
+
     return 0
 
 def get_score():

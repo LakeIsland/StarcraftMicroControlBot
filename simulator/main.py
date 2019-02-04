@@ -50,9 +50,9 @@ def train_multi_agent():
     s = socketClient()
     s.accessToServer()
     trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
-                                #file_to_load='../modeldata/deep_sarsa_3G_4Z_500_times_2019_01_27_14_27.h5',
+                                #file_to_load='../modeldata/DeepSarsa3G5Z/deep_sarsa_3G_5Z_5000_times_2019_01_31_08_54.h5',
                                 mode='train',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100],
-                                export_per=250)
+                                export_per=1000,last_action_state_also_state=True)
     trainer.train()
 
 
@@ -60,7 +60,7 @@ def test_multi_agent():
     s = socketClient()
     s.accessToServer()
     trainer = MultiAgentTrainer(s, algorithm='DeepSarsa',very_fast=False, visualize = True, max_iterate=100,
-                                file_to_load='../modeldata/deep_sarsa_3G_4Z_5000_times_2019_01_28_07_33.h5',
+                                file_to_load='../modeldata/deep_sarsa_3G_4Z_5000_times_2019_02_04_16_37.h5',
                                 mode='evaluate',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100])
     trainer.train()
 
@@ -70,7 +70,7 @@ def train_multi_agent_dqn():
     s.accessToServer()
     trainer = MultiAgentTrainer(s, algorithm='DQN', very_fast=True, visualize = False, max_iterate=5000,
                                 #file_to_load='../modeldata/deep_q_3G_3Z_500_times_2019_01_26_23_12.h5',
-                                mode='train',epsilon_decrease='LINEAR',map_name='3G_3Z',layers=[100,100],
+                                mode='train',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100],
                                 export_per=250)
     trainer.train()
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # eval = AgentEvaluator(fileName = "../q_table_test.txt")
     # eval.evaluate()
     start_time = time.time()
-    test_multi_agent()
+    train_multi_agent()
     print(str(datetime.timedelta(seconds=time.time()-start_time)))
     #trainSimpleOne()
     #testSimpleOne()
