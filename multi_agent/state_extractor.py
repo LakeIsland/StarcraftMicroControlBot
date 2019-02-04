@@ -70,8 +70,8 @@ def get_state_info(own):
             continue
         idx = direction_to_index(eu.getPosition() - own.getPosition())
         nd = distance_normalized(eu.getDistance(own), sight_range)
-        enemy_sum_info[idx] += nd
-        enemy_max_info[idx] = max(nd, enemy_max_info[idx])
+        own_sum_info[idx] += nd
+        own_max_info[idx] = max(nd, own_max_info[idx])
 
     terrain_info = [0 for _ in range(DIM_DIRECTION)]
     for i in range(DIM_DIRECTION):
@@ -128,13 +128,12 @@ def apply_action(unit, action):
 
 lastAgentCount = 0
 
-
 def reward_attack(unit, last_hitpoint, last_cool_down):
     r = 0
     if last_cool_down < unit.getGroundWeaponCooldown():
         r += unit.getType().groundWeapon().damageAmount() * unit.getType().groundWeapon().damageFactor()
     if unit.getHitPoints() + unit.getShields() < last_hitpoint:
-        r -= (160 * 4) / (125 * 3) * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
+        r -= 1.28 * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
     return r * 0.1
 
 def reward_destroy():
@@ -144,7 +143,7 @@ def reward_destroy():
     lastAgentCount = agentCount
     return reward
 
-def reward_move(unit, last_state, last_action, last_position):
+def reward_move(unit, last_state, last_action):
     if len(Broodwar.enemy().getUnits()) == 0:
         ours = 0
         for u in unit.getUnitsInRadius(unit.getType().sightRange()):
@@ -160,21 +159,15 @@ def reward_move(unit, last_state, last_action, last_position):
 
     else:
         enemies = 0
-        r = 0
         for u in unit.getUnitsInRadius(unit.getType().sightRange()):
             if u.getPlayer().getID() != Broodwar.self().getID():
                 enemies += 1
         if enemies == 0:
             last_enemy_max_info = last_state[26:26 + DIM_DIRECTION]
             if last_action == DIM_DIRECTION or last_enemy_max_info[last_action] < 0.01:
-                r-=0.5
-
-        if last_action != DIM_DIRECTION:
-            if(unit.getPosition() == last_position):
-                r-=0.5
-
-        return r
-
+                return -0.5
+            else:
+                return 0
     return 0
 
 def get_score():
