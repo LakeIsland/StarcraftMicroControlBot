@@ -89,6 +89,7 @@ class MultiAgentTrainer:
             last_action_target = {}
             last_cool_downs = {}
             last_hit_points = {}
+            last_positions = {}
             last_destroyed_own_count = 0
             last_destroyed_enemy_count = 0
 
@@ -107,6 +108,8 @@ class MultiAgentTrainer:
 
                         if e.isWinner():
                             winEpisode += 1
+
+                        Broodwar.restartGame()
 
                     elif eventtype == cybw.EventType.MatchFrame:
                         if last_frame_count >=0 and Broodwar.getFrameCount() - last_frame_count < 10:
@@ -128,7 +131,7 @@ class MultiAgentTrainer:
 
                             if (not is_first and self.do_train):
                                 r_a = reward_attack(u, last_hit_points[u.getID()], last_cool_downs[u.getID()])
-                                r_m = reward_move(u, last_states[u.getID()], last_actions[u.getID()])
+                                r_m = reward_move(u, last_states[u.getID()], last_actions[u.getID()], last_positions[u.getID()])
 
                                 reward = r_a + r_m
 
@@ -145,14 +148,14 @@ class MultiAgentTrainer:
                             last_action_target[u.getID()] = target
                             last_cool_downs[u.getID()] = u.getGroundWeaponCooldown()
                             last_hit_points[u.getID()] = u.getHitPoints() + u.getShields()
-
+                            last_positions[u.getID()] = u.getPosition()
                         step += 1
                         is_first = False
 
                     elif eventtype == cybw.EventType.UnitDestroy:
                         u = e.getUnit()
                         if u.getPlayer().getID() == Broodwar.self().getID():
-                            reward = -100
+                            reward = -20
                             last_state = last_states[u.getID()]
                             last_action = last_actions[u.getID()]
 
