@@ -4,16 +4,16 @@ from deep_sarsa.deep_sarsa_env import *
 import copy
 import numpy as np
 from multi_agent.state_extractor import *
+import statistics
+import pandas as pd
 
 EPISODES = 1000
 client = cybw.BWAPIClient
 Broodwar = cybw.Broodwar
 
-
 def reconnect():
     while not client.connect():
         time.sleep(0.5)
-
 
 class MultiAgentTrainer:
     def __init__(self, socket, very_fast=True, visualize=False, max_iterate=500, mode='train', file_to_load=''
@@ -60,11 +60,12 @@ class MultiAgentTrainer:
 
         self.test_per = test_per
         self.test_iterate = test_iterate
+        self.do_test_during_train = self.test_per > 0
 
         self.total_iterate_count = self.max_iterate + (self.max_iterate // self.test_per) * self.test_iterate
         self.total_iterate_counter = 0
 
-        self.started_time= time.time()
+
 
         assert epsilon_decrease in ["LINEAR", "EXPONENTIAL", "INVERSE_SQRT"]
 
@@ -85,6 +86,8 @@ class MultiAgentTrainer:
     def evaluate(self, target_iterate = -1, close_socket = True, print_message = True):
         episode = 0
         winEpisode = 0
+        score_list = []
+        left_unit_list = []
 
         if target_iterate == -1:
             target_iterate = self.max_iterate
@@ -118,6 +121,9 @@ class MultiAgentTrainer:
                     if eventtype == cybw.EventType.MatchEnd:
                         if e.isWinner():
                             winEpisode += 1
+
+                        left_unit_list.append(len(Broodwar.enemy().getUnits()) - len(Broodwar.self().getUnits()))
+                        score_list.append(get_score())
                         Broodwar.restartGame()
 
                     elif eventtype == cybw.EventType.MatchFrame:
@@ -161,16 +167,33 @@ class MultiAgentTrainer:
             self.total_iterate_counter += 1
 
             if print_message:
+                #print("Left enemy : %d, Score: %d" % (len(Broodwar.enemy().getUnits()), get_score()))
                 print("Win / Total : %d / %d, win rate : %.4f" % (winEpisode, episode, winEpisode / episode))
         if close_socket:
             self.socket.close()
 
-        return winEpisode / episode
+        result_info = [0 for _ in range(5)]
+        result_info[0] = winEpisode / episode
+        result_info[1] = statistics.mean(left_unit_list)
+        result_info[2] = statistics.stdev(left_unit_list)
+        result_info[3] = statistics.mean(score_list)
+        result_info[4] = statistics.stdev(score_list)
+
+        return result_info
 
     def print_expected_time(self, current_time):
-        dt = current_time - self.started_time
-        expected_left_time = dt * (self.total_iterate_count / self.total_iterate_counter) - dt
-        print("Current iterate: %d/%d, Expected left time: %s" % (self.total_iterate_counter, self.total_iterate_count, str(datetime.timedelta(seconds=expected_left_time))))
+        elapsed_time = current_time - self.started_time
+        expected_left_time = elapsed_time * (self.total_iterate_count / self.total_iterate_counter) - elapsed_time
+        print("Current iterate: %d/%d, Elapsed time: %s, Expected left time: %s" %
+              (self.total_iterate_counter, self.total_iterate_count,
+               str(datetime.timedelta(seconds=int(elapsed_time))),
+               str(datetime.timedelta(seconds=int(expected_left_time))) ))
+
+    def get_file_name(self, extend='txt'):
+        now = datetime.datetime.now()
+        nowDate = now.strftime('%Y_%m_%d_%H_%M')
+        name = "../resultData/test_result_%s_%s_%s.%s"%(self.algorithm, self.map_name, nowDate,extend)
+        return name
 
     def train(self, close_socket = True):
         # env = DeepSARSAEnvironment()
@@ -179,9 +202,12 @@ class MultiAgentTrainer:
         episode = 0
         winEpisode = 0
 
+        if(self.do_test_during_train):
+            f = open(self.get_file_name(), 'w')
+
         do_train = (self.mode == 'train')
         results = []
-
+        self.started_time = time.time()
         while episode < self.max_iterate:
             while not Broodwar.isInGame():
                 client.update()
@@ -308,10 +334,18 @@ class MultiAgentTrainer:
             if not do_train:
                 print("Win / Total : %d / %d, win rate : %.4f" % (winEpisode, episode, winEpisode / episode))
 
-            if self.test_per != -1 and episode % self.test_per == 0 and do_train:
-                winRate = self.evaluate(target_iterate=self.test_iterate, close_socket=False, print_message=False)
-                print("Win rate", winRate)
-                results.append((episode, self.epsilon, winRate))
+            if do_train and self.do_test_during_train and episode % self.test_per == 0:
+                result_info = self.evaluate(target_iterate=self.test_iterate, close_socket=False, print_message=False)
+                print("Win rate", result_info[0])
+                print("Left avg", result_info[1])
+                print("Score avg", result_info[3])
+                episode_result_info = [episode, self.epsilon] + result_info
+                results.append(episode_result_info)
+
+                str_data = ''
+                for i in episode_result_info:
+                    f.write('%f\t'%(i))
+                f.write('\n')
 
             if do_train:
                 if (self.epsilon_decrease == "LINEAR"):
@@ -326,11 +360,9 @@ class MultiAgentTrainer:
             self.print_expected_time(time.time())
 
         print(results)
-        for k in results:
-            e, eps, wr = k
-            print(e, eps, wr)
+        df = pd.DataFrame(results)
+        df.columns = ['episode','epsilon','winrate','left_unit_avg','left_unit_stdev','score_avg', 'score_stdev']
+        df.to_csv(self.get_file_name(extend='csv'))
 
         if(close_socket):
             self.socket.close()
-
-

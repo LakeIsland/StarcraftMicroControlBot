@@ -66,9 +66,9 @@ def train_multi_agent2():
 def train_multi_agent_with_eligibility():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
-                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_4Z',layers=[100, 100],
-                                export_per=1000,last_action_state_also_state=False, test_iterate=100, test_per=250, eligibility_trace=True)
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=2000,
+                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_5Z',layers=[100, 100],
+                                export_per=500,last_action_state_also_state=False, test_iterate=100, test_per=200, eligibility_trace=True)
     trainer.train()
 
 
