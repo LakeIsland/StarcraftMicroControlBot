@@ -1,5 +1,5 @@
 import cybw
-from time import sleep
+import time
 from deep_sarsa.deep_sarsa_env import *
 import copy
 import numpy as np
@@ -12,13 +12,13 @@ Broodwar = cybw.Broodwar
 
 def reconnect():
     while not client.connect():
-        sleep(0.5)
+        time.sleep(0.5)
 
 
 class MultiAgentTrainer:
     def __init__(self, socket, very_fast=True, visualize=False, max_iterate=500, mode='train', file_to_load=''
                  , algorithm = 'DeepSarsa', epsilon_decrease='EXPONENTIAL', epsilon_decay_rate=-1, map_name = '', layers=[],
-                 export_per = -1, last_action_state_also_state = False):
+                 export_per = -1, last_action_state_also_state = False, test_per = -1, test_iterate = -1, eligibility_trace = False):
         self.very_fast = very_fast
         self.socket = socket
         self.max_iterate = max_iterate
@@ -47,7 +47,8 @@ class MultiAgentTrainer:
             'map_name':map_name,
             'algorithm':algorithm,
             'layers':layers,
-            'export_per':export_per
+            'export_per':export_per,
+            'eligibility_trace':eligibility_trace
         })
 
         self.epsilon0 = 1
@@ -56,6 +57,14 @@ class MultiAgentTrainer:
         self.epsilon_decay_rate = epsilon_decay_rate
         if (epsilon_decay_rate == -1):
             self.epsilon_decay_rate = 1 - 2 / max_iterate
+
+        self.test_per = test_per
+        self.test_iterate = test_iterate
+
+        self.total_iterate_count = self.max_iterate + (self.max_iterate // self.test_per) * self.test_iterate
+        self.total_iterate_counter = 0
+
+        self.started_time= time.time()
 
         assert epsilon_decrease in ["LINEAR", "EXPONENTIAL", "INVERSE_SQRT"]
 
@@ -73,12 +82,105 @@ class MultiAgentTrainer:
             action = action[0]
         return action
 
-    def train(self):
+    def evaluate(self, target_iterate = -1, close_socket = True, print_message = True):
+        episode = 0
+        winEpisode = 0
+
+        if target_iterate == -1:
+            target_iterate = self.max_iterate
+
+        while episode < target_iterate:
+            while not Broodwar.isInGame():
+                client.update()
+                if not client.isConnected():
+                    print("Reconnecting...")
+                    reconnect()
+
+            if (self.very_fast):
+                Broodwar.setLocalSpeed(0)
+                Broodwar.setGUI(False)
+
+            Broodwar.sendText("black sheep wall")
+
+            last_states = {}
+            last_actions = {}
+
+            last_action_target = {}
+
+            step = 0
+            is_first = True
+            last_frame_count = -1
+            while Broodwar.isInGame():
+
+                events = Broodwar.getEvents()
+                for e in events:
+                    eventtype = e.getType()
+                    if eventtype == cybw.EventType.MatchEnd:
+                        if e.isWinner():
+                            winEpisode += 1
+                        Broodwar.restartGame()
+
+                    elif eventtype == cybw.EventType.MatchFrame:
+                        if last_frame_count >= 0 and Broodwar.getFrameCount() - last_frame_count < 5:
+                            continue
+                        last_frame_count = Broodwar.getFrameCount()
+
+                        for u in Broodwar.self().getUnits():
+                            if not u.exists():
+                                continue
+                            state = get_state_info(u)
+                            if self.last_action_state_also_state:
+                                last_action = [0 for _ in range(9)]
+                                if is_first:
+                                    last_state = state
+                                else:
+                                    last_state = last_states[u.getID()]
+                                    last_action[last_actions[u.getID()]] = 1
+
+                                nn_state = state + last_state + last_action
+                            else:
+                                nn_state = state
+
+                            action = self.get_action(nn_state, do_train=False)
+                            target = apply_action(u, action)
+
+                            last_actions[u.getID()] = action
+                            last_action_target[u.getID()] = target
+
+                        step += 1
+                        is_first = False
+
+                if self.visualize:
+                    draw_action(last_actions, last_action_target)
+
+                client.update()
+
+            if close_socket:
+                self.socket.sendMessage(tag="finish", msg=[11111])
+            episode += 1
+            self.total_iterate_counter += 1
+
+            if print_message:
+                print("Win / Total : %d / %d, win rate : %.4f" % (winEpisode, episode, winEpisode / episode))
+        if close_socket:
+            self.socket.close()
+
+        return winEpisode / episode
+
+    def print_expected_time(self, current_time):
+        dt = current_time - self.started_time
+        expected_left_time = dt * (self.total_iterate_count / self.total_iterate_counter) - dt
+        print("Current iterate: %d/%d, Expected left time: %s" % (self.total_iterate_counter, self.total_iterate_count, str(datetime.timedelta(seconds=expected_left_time))))
+
+    def train(self, close_socket = True):
         # env = DeepSARSAEnvironment()
         # agent = DeepSarsaAgent()
 
         episode = 0
         winEpisode = 0
+
+        do_train = (self.mode == 'train')
+        results = []
 
         while episode < self.max_iterate:
             while not Broodwar.isInGame():
@@ -113,7 +215,7 @@ class MultiAgentTrainer:
                 for e in events:
                     eventtype = e.getType()
                     if eventtype == cybw.EventType.MatchEnd:
-                        if (self.do_train):
+                        if (do_train):
                             print("Episode %d ended in %d steps, epsilon : %.4f" % (episode + 1, step, self.epsilon))
                             print("Left enemy : %d, Score: %d" % (len(Broodwar.enemy().getUnits()), get_score()))
 
@@ -123,7 +225,7 @@ class MultiAgentTrainer:
                         Broodwar.restartGame()
 
                     elif eventtype == cybw.EventType.MatchFrame:
-                        if last_frame_count >=0 and Broodwar.getFrameCount() - last_frame_count < 10:
+                        if last_frame_count >=0 and Broodwar.getFrameCount() - last_frame_count < 5:
                             continue
                         last_frame_count = Broodwar.getFrameCount()
                         #print('frame: ', last_frame_count)
@@ -149,7 +251,7 @@ class MultiAgentTrainer:
                             else:
                                 nn_state = state
 
-                            action = self.get_action(nn_state, self.do_train)
+                            action = self.get_action(nn_state, do_train)
                             target = apply_action(u, action)
 
                             if (not is_first):
@@ -158,10 +260,10 @@ class MultiAgentTrainer:
 
                                 reward = r_a + r_m
 
-                                if(self.do_train):
+                                if(do_train):
                                     last_nn_state = last_nn_states[u.getID()]
                                     last_action = last_actions[u.getID()]
-                                    sarsa = [last_nn_state, last_action, reward, nn_state, action, 0]
+                                    sarsa = [last_nn_state, last_action, reward, nn_state, action, u.getID(), 0]
                                     self.socket.sendMessage(tag="sarsa", msg=sarsa)
                                     tag, _ = self.socket.receiveMessage()
                                     assert tag == 'trainFinished'
@@ -186,7 +288,7 @@ class MultiAgentTrainer:
                             last_nn_state = last_nn_states[u.getID()]
                             last_action = last_actions[u.getID()]
 
-                            sarsa = [last_nn_state, last_action, reward, last_nn_state, last_action, 1]
+                            sarsa = [last_nn_state, last_action, reward, last_nn_state, last_action, u.getID(), 1]
                             self.socket.sendMessage(tag="sarsa", msg=sarsa)
                             tag, _ = self.socket.receiveMessage()
                             assert tag == 'trainFinished'
@@ -200,17 +302,35 @@ class MultiAgentTrainer:
 
                 client.update()
 
-            self.socket.sendMessage(tag="finish", msg=[11111])
-
             episode += 1
-            if not self.do_train:
+            self.total_iterate_counter += 1
+
+            if not do_train:
                 print("Win / Total : %d / %d, win rate : %.4f" % (winEpisode, episode, winEpisode / episode))
 
-            if (self.epsilon_decrease == "LINEAR"):
-                self.epsilon = self.epsilon0 * (self.max_iterate - episode) / self.max_iterate
-            elif (self.epsilon_decrease == "EXPONENTIAL"):
-                self.epsilon *= self.epsilon_decay_rate
-            elif (self.epsilon_decrease == "INVERSE_SQRT"):
-                self.epsilon = self.epsilon0 / math.sqrt(1 + episode)
-        self.socket.close()
+            if self.test_per != -1 and episode % self.test_per == 0 and do_train:
+                winRate = self.evaluate(target_iterate=self.test_iterate, close_socket=False, print_message=False)
+                print("Win rate", winRate)
+                results.append((episode, self.epsilon, winRate))
+
+            if do_train:
+                if (self.epsilon_decrease == "LINEAR"):
+                    self.epsilon = self.epsilon0 * (self.max_iterate - episode) / self.max_iterate
+                elif (self.epsilon_decrease == "EXPONENTIAL"):
+                    self.epsilon *= self.epsilon_decay_rate
+                elif (self.epsilon_decrease == "INVERSE_SQRT"):
+                    self.epsilon = self.epsilon0 / math.sqrt(1 + episode)
+
+            self.socket.sendMessage(tag="finish", msg=[11111])
+
+            self.print_expected_time(time.time())
+
+        print(results)
+        for k in results:
+            e, eps, wr = k
+            print(e, eps, wr)
+
+        if(close_socket):
+            self.socket.close()
+
 

@@ -55,13 +55,30 @@ def train_multi_agent():
                                 export_per=1000,last_action_state_also_state=True)
     trainer.train()
 
+def train_multi_agent2():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=3000,
+                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_4Z',layers=[100,100],
+                                export_per=1000,last_action_state_also_state=False, test_iterate=50, test_per=500)
+    trainer.train()
+
+def train_multi_agent_with_eligibility():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
+                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_4Z',layers=[100, 100],
+                                export_per=1000,last_action_state_also_state=False, test_iterate=100, test_per=250, eligibility_trace=True)
+    trainer.train()
+
 
 def test_multi_agent():
     s = socketClient()
     s.accessToServer()
     trainer = MultiAgentTrainer(s, algorithm='DeepSarsa',very_fast=False, visualize = True, max_iterate=100,
-                                file_to_load='../modeldata/deep_sarsa_3G_4Z_5000_times_2019_02_04_16_37.h5',
-                                mode='evaluate',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100])
+                                file_to_load='../modeldata/deep_sarsa_3G_4Z_6000_times_2019_02_05_05_09.h5',
+                                mode='evaluate',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100]
+                                , last_action_state_also_state = False)
     trainer.train()
 
 
@@ -86,7 +103,7 @@ if __name__ == "__main__":
     # eval = AgentEvaluator(fileName = "../q_table_test.txt")
     # eval.evaluate()
     start_time = time.time()
-    train_multi_agent()
+    train_multi_agent_with_eligibility()
     print(str(datetime.timedelta(seconds=time.time()-start_time)))
     #trainSimpleOne()
     #testSimpleOne()

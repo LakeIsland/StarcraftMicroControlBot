@@ -143,6 +143,15 @@ def reward_destroy():
     lastAgentCount = agentCount
     return reward
 
+def print_state(state):
+    print("cool down", state[0])
+    print("health", state[1])
+    print("own sum", state[2:10])
+    print("own max", state[10:18])
+    print("ene sum", state[18:26])
+    print("ene max", state[26:34])
+    print("terrain", state[34:42])
+
 def reward_move(unit, last_state, last_action, last_position):
     if len(Broodwar.enemy().getUnits()) == 0:
         ours = 0
@@ -153,7 +162,7 @@ def reward_move(unit, last_state, last_action, last_position):
             return 0
         last_own_max_info = last_state[10:10+DIM_DIRECTION]
         if last_action == DIM_DIRECTION or last_own_max_info[last_action] < 0.01:
-            return -5
+            return -0.5
         else:
             return 0
 
@@ -168,6 +177,10 @@ def reward_move(unit, last_state, last_action, last_position):
             last_enemy_max_info = last_state[26:26 + DIM_DIRECTION]
             if last_action == DIM_DIRECTION or last_enemy_max_info[last_action] < 0.01:
                 reward -= 0.5
+                # if last_action == DIM_DIRECTION:
+                #     print("NO ATTACK")
+                #     print_state(last_state)
+
 
         # cannot move
         if last_action < DIM_DIRECTION:
@@ -179,9 +192,9 @@ def reward_move(unit, last_state, last_action, last_position):
             # terrains = last_state[34:42]
             # if terrains[last_action] > 0.7 or own_unit[last_action] > 0.99 or ene_unit[last_action] > 0.9:
             #     reward -= 2
-                #print("Last action was", last_action)
-                #print("Terrain:", terrains[last_action], "Own:", own_unit[last_action], "Ene:", ene_unit[last_action])
-                #print("CANNOT MOVE")
+            #     print("Last action was", last_action)
+            #     print("Terrain:", terrains[last_action], "Own:", own_unit[last_action], "Ene:", ene_unit[last_action])
+            #     print("CANNOT MOVE")
 
         return reward
 
