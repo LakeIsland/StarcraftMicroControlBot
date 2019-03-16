@@ -1,7 +1,7 @@
 import cybw
 Broodwar = cybw.Broodwar
 import math
-from utilities import *
+from simulator.utilities import *
 
 DIM_DIRECTION = 8
 UNIT_THETA = 2 * math.pi / DIM_DIRECTION
@@ -133,7 +133,7 @@ def reward_attack(unit, last_hitpoint, last_cool_down):
     if last_cool_down < unit.getGroundWeaponCooldown():
         r += unit.getType().groundWeapon().damageAmount() * unit.getType().groundWeapon().damageFactor()
     if unit.getHitPoints() + unit.getShields() < last_hitpoint:
-        r -= (160 * 4) / (125 * 3) * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
+        r -= (160 * 6) / (125 * 3) * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
     return r * 0.1
 
 def reward_destroy():

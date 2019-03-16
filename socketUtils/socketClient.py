@@ -5,8 +5,7 @@ class socketClient:
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def accessToServer(self):
-        port = 1234
+    def accessToServer(self, port=1234):
         self.s.connect(('localhost', port))
 
     def sendMessage(self, tag, msg):

@@ -1,4 +1,4 @@
-from utilities import *
+from simulator.utilities import *
 import cybw
 import numpy as np
 Broodwar = cybw.Broodwar

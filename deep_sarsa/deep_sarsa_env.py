@@ -1,5 +1,5 @@
 from simple_agent.env import Environment
-from utilities import *
+from simulator.utilities import *
 
 class DeepSARSAEnvironment(Environment):
     def getCurrentState(self):

@@ -6,6 +6,9 @@ import re
 def clamp(x, x_min, x_max):
     return x_min if x < x_min else (x_max if x > x_max else x)
 
+def lerp(a, b, v):
+    return a * (1-v) + b * v
+
 def argmax(state_action):
     max_index_list = []
     max_value = state_action[0]

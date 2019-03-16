@@ -3,6 +3,7 @@ from time import sleep
 from simple_agent.env import Environment
 from simple_agent.agent import Agent
 from simulator.utilities import *
+import inspect
 
 client = cybw.BWAPIClient
 Broodwar = cybw.Broodwar
@@ -10,8 +11,36 @@ Broodwar = cybw.Broodwar
 def reconnect():
     while not client.connect():
         sleep(0.5)
+def methods(cls):
+    return [x for x, y in cls.__dict__.items()]
 
-class AgentTrainer:
+def getClosestUnit(unit):
+    closestEnemy = None
+    for enemy in Broodwar.enemy().getUnits():
+        if enemy.getType().isBuilding():
+            continue
+        if (closestEnemy == None or unit.getDistance(enemy) < unit.getDistance(closestEnemy)):
+            closestEnemy = enemy
+    return closestEnemy
+
+def drawBullets():
+    bullets = Broodwar.getBullets()
+    for bullet in bullets:
+        # print(bullet.getType())
+        p = bullet.getPosition()
+        velocityX = bullet.getVelocityX()
+        velocityY = bullet.getVelocityY()
+        lineColor = cybw.Colors.Green
+        textColor = cybw.Text.Green
+        a = bullet.getTargetPosition()
+        # if bullet.getPlayer() == Broodwar.self():
+        #     lineColor = cybw.Colors.Green
+        #     textColor = cybw.Text.Green
+        Broodwar.drawLineMap(p, a, cybw.Colors.Green)
+        #Broodwar.drawLineMap(p, p+cybw.Position(velocityX, velocityY), lineColor)
+        Broodwar.drawTextMap(p, chr(textColor) + str(bullet.getType()))
+
+class ArchonTest:
     def __init__(self, fileName='', maxIterate = 500, visualize = False, very_fast = True, algorithm = "Q_LEARNING",
                  epsilon0 = 0.9, epsilon_decrease = "EXPONENTIAL", epsilon_decay_rate = -1):
         self.maxIterate = maxIterate
@@ -28,6 +57,13 @@ class AgentTrainer:
 
         assert algorithm in ["Q_LEARNING", "SARSA"]
         assert epsilon_decrease in ["LINEAR", "EXPONENTIAL","INVERSE_SQRT"]
+
+        #parser = cybw.Unit()
+        from types import FunctionType
+
+        print(methods(cybw.Unitset))
+        print(inspect.getmembers(cybw.Unit, predicate=inspect.ismethod))
+        #print(inspect.getmembers(parser, predicate=inspect.ismethod))
 
     def train(self):
         env = Environment()
@@ -58,7 +94,7 @@ class AgentTrainer:
             last_state = -1
             last_action = -1
             step = 0
-
+            Broodwar.setCommandOptimizationLevel(4)
             while Broodwar.isInGame():
                 events = Broodwar.getEvents()
                 for e in events:
@@ -66,40 +102,22 @@ class AgentTrainer:
                     if eventtype == cybw.EventType.MatchEnd:
                         print("Episode %d ended in %d steps, epsilon : %.4f" % (episode+1, step, agent.epsilon))
                         print("Left enemy : %d, Score:, %d" % (len(Broodwar.enemy().getUnits()), env.getScore()))
+                    elif eventtype == cybw.EventType.MatchFrame:
+                        #Broodwar.self().getUnits().issueCommand(cybw.UnitCommandType)
+                        #print(type(Broodwar.self().getUnits()))
+                        #print(methods(type(Broodwar.self().getUnits())) )
+                            #.useTech(cybw.TechTypes.Archon_Warp)
+                        dod = False
+                        for u in Broodwar.self().getUnits():
+                            if not dod:
+                                if u.getEnergy() < 75:
+                                    continue
+                                aa = getClosestUnit(u)
+                                if aa is not None:
+                                    u.useTech(cybw.TechTypes.Psionic_Storm, aa.getPosition())
+                                    dod = True
 
-                if(not env.done):
-                    if (env.isActionFinished):
-                        state = env.getCurrentState()
-                        action = agent.getAction(state)
-                        reward = env.getReward()
-                        env.applyAction(action)
-
-                        if (last_state >= 0):
-                            #reward = env.getReward()
-                            if(self.algorithm is "Q_LEARNING"):
-                                agent.learn_qlearning(last_state, last_action, reward, state)
-                            elif(self.algorithm is "SARSA"):
-                                agent.learn_sarsa(last_state, last_action, reward, state, action)
-
-                        last_state = state
-                        last_action = action
-                        step += 1
-                    else:
-                        env.doAction()
-                    if (self.visualize):
-                        env.draw_circles()
-
-                    env.check_game_done()
-                    if(env.done):
-                        state = env.getCurrentState()
-                        action = agent.getAction(state)
-                        reward = env.getReward()
-                        if (last_state >= 0):
-                            if (self.algorithm is "Q_LEARNING"):
-                                agent.learn_qlearning(last_state, last_action, reward, state)
-                            elif (self.algorithm is "SARSA"):
-                                agent.learn_sarsa(last_state, last_action, reward, state, action)
-
+                drawBullets()
                 client.update()
 
             episode += 1

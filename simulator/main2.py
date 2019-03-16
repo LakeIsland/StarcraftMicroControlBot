@@ -1,13 +1,11 @@
 from deep_sarsa.deep_sarsa_agent_trainer import DeepSARSAAgentTrainer
 from socketUtils.socketClient import *
 from deep_q_agent_trainer import DeepQAgentTrainer
-from simple_agent.agentTrainer import AgentTrainer
-from simple_agent.agentEvaluator import AgentEvaluator
+from agentTrainer import AgentTrainer
+from agentEvaluator import AgentEvaluator
 import sys, os
 from multi_agent.multi_agent_trainer import MultiAgentTrainer
-from simple_agent.archon_test import *
 import time, datetime
-from simple_agent.epsilon_decay import *
 
 def trainSimpleOne():
     trainer = AgentTrainer(maxIterate=1000, epsilon_decrease="LINEAR", algorithm="Q_LEARNING")
@@ -19,10 +17,6 @@ def trainSimpleOne():
         print(exc_type, fname, exc_tb.tb_lineno)
         print("Unexpected error:", sys.exc_info()[0])
         trainer.export()
-
-def trainSimpleOne2():
-    trainer = ArchonTest(maxIterate=1000, epsilon_decrease="LINEAR", algorithm="Q_LEARNING", visualize=True, very_fast=False)
-    trainer.train()
 
 def testSimpleOne():
     tester = AgentEvaluator(maxIterate=100,fileName="../tableData/Q_LEARNING_1000times_2019_01_11_00_31.txt",
@@ -55,47 +49,37 @@ def trainDQN():
 def train_multi_agent():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
                                 #file_to_load='../modeldata/DeepSarsa3G5Z/deep_sarsa_3G_5Z_5000_times_2019_01_31_08_54.h5',
-                                mode='train',map_name='3G_4Z',layers=[100,100],
+                                mode='train',epsilon_decrease='LINEAR',map_name='3G_4Z',layers=[100,100],
                                 export_per=1000,last_action_state_also_state=True)
     trainer.train()
 
 def train_multi_agent2():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=3000,
-                                mode='train',map_name='3G_4Z',layers=[100,100],
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=3000,
+                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_4Z',layers=[100,100],
                                 export_per=1000,last_action_state_also_state=False)
     trainer.train()
 
 def train_multi_agent_with_eligibility():
     s = socketClient()
-    s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
-                                mode='train',map_name='3G_6Z',layers=[100, 100],
+    s.accessToServer(1235)
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
+                                mode='train',epsilon_decrease='INVERSE_SQRT',map_name='3G_6Z',layers=[100, 100],
                                 export_per=100,last_action_state_also_state=False,
                                 eligibility_trace=True)
 
-    trainer.train(do_test_during_train=False)
+    trainer.train(do_test_during_train=False, max_frame=9500)
     #trainer.train(do_test_during_train=True, test_per=10, test_iterate=6, test_zero=True)
-
-def train_multi_agent_a2c():
-    s = socketClient()
-    s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='A2C', very_fast=True, visualize = False,
-                                max_iterate=3000,
-                                mode='train',map_name='3G_6Z', actor_layers=[100, 100], critic_layers=[100, 100],
-                                export_per=1000,last_action_state_also_state=False)
-
-    trainer.train(do_test_during_train=False)
 
 def test_multi_agent():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=100,
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=False, visualize = True, max_iterate=100,
                                 file_or_folder_to_load='../modeldata/deep_sarsa_3G_6Z_2019_02_06_00_48/deep_sarsa_3G_6Z_4000_times_2019_02_06_11_31.h5',
-                                mode='evaluate', map_name='3G_6Z', layers=[100,100]
+                                mode='evaluate', epsilon_decrease='LINEAR', map_name='3G_6Z', layers=[100,100]
                                 , last_action_state_also_state = False)
     trainer.train()
 
@@ -103,7 +87,7 @@ def test_multi_agent():
 def test_multi_agent_multiple_models():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='DeepSarsa', very_fast=True, visualize=False, max_iterate=100,
+    trainer = MultiAgentTrainer(s, algorithm='DeepSarsa', very_fast=True, visualize=False, max_iterate=100,
                                 file_or_folder_to_load='../modeldata/multi_test',
                                 mode='evaluate_multiple_models', map_name='3G_6Z', layers=[100, 100]
                                 , last_action_state_also_state=False)
@@ -132,10 +116,8 @@ if __name__ == "__main__":
     # eval = AgentEvaluator(fileName = "../q_table_test.txt")
     # eval.evaluate()
     start_time = time.time()
+    train_multi_agent_with_eligibility()
     #test_multi_agent()
-    #trainSimpleOne2()
-    #test_multi_agent()
-    train_multi_agent_a2c()
     print(str(datetime.timedelta(seconds=time.time()-start_time)))
     #trainSimpleOne()
     #testSimpleOne()
