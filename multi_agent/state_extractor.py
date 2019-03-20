@@ -128,9 +128,9 @@ def apply_action(unit, action):
 
 lastAgentCount = 0
 
-def reward_attack(unit, last_hitpoint, last_cool_down):
+def reward_attack(unit, last_hitpoint, last_cool_down, last_action):
     r = 0
-    if last_cool_down < unit.getGroundWeaponCooldown():
+    if last_action == DIM_DIRECTION and last_cool_down < unit.getGroundWeaponCooldown():
         r += unit.getType().groundWeapon().damageAmount() * unit.getType().groundWeapon().damageFactor()
     if unit.getHitPoints() + unit.getShields() < last_hitpoint:
         r -= (160 * 6) / (125 * 3) * (last_hitpoint - (unit.getHitPoints() + unit.getShields()))
@@ -151,6 +151,19 @@ def print_state(state):
     print("ene sum", state[18:26])
     print("ene max", state[26:34])
     print("terrain", state[34:42])
+
+
+def reward_last_action(unit, last_action, last_position, last_cool_down):
+    reward = 0
+    # cannot move
+    if last_action < DIM_DIRECTION:
+        if unit.getPosition() == last_position:
+            reward -= 0.5
+    if last_action == DIM_DIRECTION:
+        if last_cool_down >= unit.getGroundWeaponCooldown():
+            reward -= 0.5
+
+    return reward
 
 def reward_move(unit, last_state, last_action, last_position):
     if len(Broodwar.enemy().getUnits()) == 0:
@@ -224,3 +237,9 @@ def draw_action(last_actions, last_action_targets):
             Broodwar.drawLineMap(u.getPosition(), last_action_targets[u.getID()].getPosition(), cybw.Colors.Red)
         else:
             Broodwar.drawLineMap(u.getPosition(), last_action_targets[u.getID()], cybw.Colors.White)
+
+# import numpy as np
+# a = np.zeros((5,6))
+# a[4][3] = 1
+# b = np.frombuffer(a.tobytes()).reshape((5,6))
+# print(b[4][3])

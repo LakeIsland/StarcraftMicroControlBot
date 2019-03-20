@@ -3,27 +3,31 @@ import time
 from deep_sarsa.deep_sarsa_env import *
 import copy
 import numpy as np
-from multi_agent.state_extractor import *
 import statistics
 import pandas as pd
 from simple_agent.epsilon_decay import *
 import datetime
 import random
 from simple_agent.epsilon_decay import *
+from multi_agent.observation import *
+from multi_agent.state_extractor import *
+
 EPISODES = 1000
 client = cybw.BWAPIClient
 Broodwar = cybw.Broodwar
+
 
 def reconnect():
     while not client.connect():
         time.sleep(0.5)
 
 
-class MultiAgentTrainer:
-    def __init__(self, socket, epsilon_decay:EpsilonDecay, very_fast=True, visualize=False, max_iterate=500, mode='train', file_or_folder_to_load=''
-                 , algorithm = 'DeepSarsa', map_name = '', layers=[],
+class MultiAgentTrainerCNN:
+    def __init__(self, socket, epsilon_decay: EpsilonDecay, very_fast=True, visualize=False, max_iterate=500,
+                 mode='train', file_or_folder_to_load=''
+                 , algorithm='DeepSarsa', map_name='', layers=[],
                  actor_layers=[], critic_layers=[],
-                 export_per = -1, last_action_state_also_state=False, eligibility_trace = False):
+                 export_per=-1, last_action_state_also_state=False, eligibility_trace=False):
         self.very_fast = very_fast
         self.socket = socket
         self.max_iterate = max_iterate
@@ -37,16 +41,14 @@ class MultiAgentTrainer:
         self.do_train = (mode == 'train')
 
         self.algorithm = algorithm
-        assert algorithm in ['DeepSarsa','DQN','A2C']
+        assert algorithm in ['DeepSarsa', 'DQN', 'A2C', "CNN"]
         self.last_action_state_also_state = last_action_state_also_state
-        self.state_size = 42
-        self.action_size = 9
-        self.map_name = map_name
 
-        if self.last_action_state_also_state:
-            self.nn_size = self.state_size * 2 + self.action_size
-        else:
-            self.nn_size = self.state_size
+        self.state_size = X_SIZE * Y_SIZE * STATE_SIZE + NON_SPATIAL_SIZE
+
+        self.action_size = 9
+
+        self.map_name = map_name
 
         self.export_per = export_per
         self.eligibility_trace = eligibility_trace
@@ -55,15 +57,18 @@ class MultiAgentTrainer:
             'max_iterate': max_iterate,
             'mode': mode,
             'file_or_folder_to_load': file_or_folder_to_load,
-            'action_size':self.action_size,
-            'state_size':self.nn_size,
-            'map_name':map_name,
-            'algorithm':algorithm,
-            'layers':layers,
-            'actor_layers':actor_layers,
-            'critic_layers':critic_layers,
-            'export_per':export_per,
-            'eligibility_trace':eligibility_trace
+            'action_size': self.action_size,
+            'frame_size':(X_SIZE, Y_SIZE, STATE_SIZE),
+            'minimap_frame_size': (X_SIZE, Y_SIZE, MINIMAP_STATE_SIZE),
+            'state_size': self.state_size,
+            'map_name': map_name,
+            'algorithm': algorithm,
+            'layers': layers,
+            'actor_layers': actor_layers,
+            'critic_layers': critic_layers,
+            'export_per': export_per,
+            'eligibility_trace': eligibility_trace,
+            'non_spatial_state_size' : NON_SPATIAL_SIZE
         })
 
         tag, _ = self.socket.receiveMessage()
@@ -77,9 +82,10 @@ class MultiAgentTrainer:
 
         self.epsilon = 1
         self.epsilon_decay = epsilon_decay
-        
 
-    def set_epsilon_decay(self, epsilon_decay:EpsilonDecay):
+        self.observation = Observation(include_self=False)
+
+    def set_epsilon_decay(self, epsilon_decay: EpsilonDecay):
         self.epsilon_decay = epsilon_decay
 
     def update_epsilon(self, episode):
@@ -87,8 +93,8 @@ class MultiAgentTrainer:
 
     def get_action(self, state, do_train=True):
         if (np.random.random() <= self.epsilon):
-            #return random.randint(0, 8)
-            if(np.random.random() > 0.5):
+            # return random.randint(0, 8)
+            if (np.random.random() > 0.5):
                 action = random.randint(0, 7)
             else:
                 action = 8
@@ -99,10 +105,10 @@ class MultiAgentTrainer:
             action = action[0]
         return action
 
-    def evaluate_multiple(self, test_file_path, test_zero=True, test_per = -1, test_iter = -1):
+    def evaluate_multiple(self, test_file_path, test_zero=True, test_per=-1, test_iter=-1):
         result_file = open("../resultData/%s_test_result.txt" % test_file_path, 'w')
 
-        self.socket.sendMessage(tag="test_multiple_model_info", msg ={
+        self.socket.sendMessage(tag="test_multiple_model_info", msg={
             'test_file_path': test_file_path,
             'test_per': test_per
         })
@@ -144,7 +150,7 @@ class MultiAgentTrainer:
 
         self.socket.close()
 
-    def evaluate(self, target_iterate = -1, close_socket = True, print_message = True, step_frame=5, max_frame=10000):
+    def evaluate(self, target_iterate=-1, close_socket=True, print_message=True, step_frame=5, max_frame=10000):
         episode = 0
         winEpisode = 0
         timeOutEpisode = 0
@@ -166,9 +172,11 @@ class MultiAgentTrainer:
                 Broodwar.setLocalSpeed(0)
                 Broodwar.setGUI(False)
 
-            #Broodwar.sendText("black sheep wall")
+            # Broodwar.sendText("black sheep wall")
 
             last_states = {}
+            last_spatial_states = {}
+
             last_actions = {}
 
             last_action_target = {}
@@ -191,40 +199,28 @@ class MultiAgentTrainer:
                             step_list.append(step)
 
                         left_unit_list.append(len(Broodwar.self().getUnits()) - len(Broodwar.enemy().getUnits()))
-                        score_list.append(get_score())
+                        #score_list.append(get_score())
                         Broodwar.restartGame()
 
                     elif eventtype == cybw.EventType.MatchFrame:
-                        if last_frame_count >=0 and Broodwar.getFrameCount() - last_frame_count < step_frame:
+                        if last_frame_count >= 0 and Broodwar.getFrameCount() - last_frame_count < step_frame:
                             continue
 
                         if Broodwar.getFrameCount() > max_frame:
-                            #print("Time over")
+                            # print("Time over")
                             timeOutEpisode += 1
                             Broodwar.restartGame()
                             # Broodwar.leaveGame()
 
                         last_frame_count = Broodwar.getFrameCount()
-
+                        state_minimap = self.observation.get_minimap_state()
                         for u in Broodwar.self().getUnits():
                             if not u.exists():
                                 continue
-                            state = get_state_info(u)
-                            if self.last_action_state_also_state:
-                                last_action = [0 for _ in range(9)]
-                                if is_first:
-                                    last_state = state
-                                else:
-                                    last_state = last_states[u.getID()]
-                                    last_action[last_actions[u.getID()]] = 1
-
-                                nn_state = state + last_state + last_action
-                            else:
-                                nn_state = state
-
-                            action = self.get_action(nn_state, do_train=False)
+                            spatial_state = self.observation.get_local_state(u)
+                            non_spatial_state = self.observation.get_non_spatial_state(u)
+                            action = self.get_action((spatial_state, state_minimap, non_spatial_state), do_train=False)
                             target = apply_action(u, action)
-
                             last_actions[u.getID()] = action
                             last_action_target[u.getID()] = target
 
@@ -232,6 +228,8 @@ class MultiAgentTrainer:
                         is_first = False
 
                 if self.visualize:
+                    #self.observation.draw_box()
+                    self.observation.draw_minimap()
                     draw_action(last_actions, last_action_target)
 
                 client.update()
@@ -241,7 +239,7 @@ class MultiAgentTrainer:
             self.socket.sendMessage(tag="episode finished", msg=[episode])
 
             if print_message:
-                #print("Left enemy : %d, Score: %d" % (len(Broodwar.enemy().getUnits()), get_score()))
+                # print("Left enemy : %d, Score: %d" % (len(Broodwar.enemy().getUnits()), get_score()))
                 print("Win / Total : %d / %d, win rate : %.4f" % (winEpisode, episode, winEpisode / episode))
         if close_socket:
             self.socket.close()
@@ -264,20 +262,22 @@ class MultiAgentTrainer:
         print("Current iterate: %d/%d, Elapsed time: %s, Expected left time: %s" %
               (self.total_iterate_counter, self.total_iterate_count,
                str(datetime.timedelta(seconds=int(elapsed_time))),
-               str(datetime.timedelta(seconds=int(expected_left_time))) ))
+               str(datetime.timedelta(seconds=int(expected_left_time)))))
 
     def get_file_name(self, extend='txt'):
         now = datetime.datetime.now()
         nowDate = now.strftime('%Y_%m_%d_%H_%M')
-        name = "../resultData/test_result_%s_%s_%s.%s"%(self.algorithm, self.map_name, nowDate,extend)
+        name = "../resultData/test_result_%s_%s_%s.%s" % (self.algorithm, self.map_name, nowDate, extend)
         return name
 
-    def train(self, do_test_during_train=False, test_per=-1, test_iterate=-1, test_zero=True, step_frame=10, max_frame=10000):
+    def train(self, do_test_during_train=False, test_per=-1, test_iterate=-1, test_zero=True, step_frame=10,
+              max_frame=10000):
         # env = DeepSARSAEnvironment()
         # agent = DeepSarsaAgent()
         if do_test_during_train:
             assert test_per != -1 and test_iterate != -1
-            self.total_iterate_count = self.max_iterate + ((self.max_iterate // test_per) + (1 if test_zero else 0)) * test_iterate
+            self.total_iterate_count = self.max_iterate + (
+                        (self.max_iterate // test_per) + (1 if test_zero else 0)) * test_iterate
         else:
             self.total_iterate_count = self.max_iterate
 
@@ -323,9 +323,10 @@ class MultiAgentTrainer:
 
             # Broodwar.sendText("black sheep wall")
 
+            #last_minimap_state = None
             last_states = {}
             last_actions = {}
-            last_nn_states = {}
+            #last_nn_states = {}
 
             last_action_target = {}
             last_cool_downs = {}
@@ -350,7 +351,8 @@ class MultiAgentTrainer:
                             if self.algorithm == "A2C":
                                 print("Episode %d ended in %d steps" % (episode + 1, step))
                             else:
-                                print("Episode %d ended in %d steps, epsilon : %.4f" % (episode + 1, step, self.epsilon))
+                                print(
+                                    "Episode %d ended in %d steps, epsilon : %.4f" % (episode + 1, step, self.epsilon))
                             cur_score = get_score()
                             if cur_score == 0 and len(Broodwar.enemy().getUnits()) > 0:
                                 cur_score = last_score
@@ -364,60 +366,58 @@ class MultiAgentTrainer:
                         Broodwar.restartGame()
 
                     elif eventtype == cybw.EventType.MatchFrame:
-                        if last_frame_count >=0 and Broodwar.getFrameCount() - last_frame_count < step_frame:
+                        if last_frame_count >= 0 and Broodwar.getFrameCount() - last_frame_count < step_frame:
                             continue
 
                         last_score = get_score()
 
                         if Broodwar.getFrameCount() > max_frame:
                             print("Time over")
-                            #Broodwar.leaveGame()
+                            # Broodwar.leaveGame()
                             Broodwar.restartGame()
 
                         last_frame_count = Broodwar.getFrameCount()
-                        #print('frame: ', last_frame_count)
-                        #print('destroyed:', last_destroyed_enemy_count, last_destroyed_own_count)
+                        # print('frame: ', last_frame_count)
+                        # print('destroyed:', last_destroyed_enemy_count, last_destroyed_own_count)
                         r_d = last_destroyed_own_count * -10 + last_destroyed_enemy_count * 10
                         last_destroyed_own_count = 0
                         last_destroyed_enemy_count = 0
+
+                        minimap_state = self.observation.get_minimap_state()
 
                         for u in Broodwar.self().getUnits():
                             if not u.exists():
                                 continue
 
-                            state = get_state_info(u)
-                            if self.last_action_state_also_state:
-                                last_action = [0 for _ in range(9)]
-                                if is_first:
-                                    last_state = state
-                                else:
-                                    last_state = last_states[u.getID()]
-                                    last_action[last_actions[u.getID()]] = 1
-
-                                nn_state = state + last_state + last_action
-                            else:
-                                nn_state = state
-
-                            action = self.get_action(nn_state, do_train)
+                            spatial_state = self.observation.get_local_state(u)
+                            non_spatial_state = self.observation.get_non_spatial_state(u)
+                            state = (spatial_state, minimap_state, non_spatial_state)
+                            action = self.get_action(state, do_train)
                             target = apply_action(u, action)
 
                             if not is_first:
                                 r_a = reward_attack(u, last_hit_points[u.getID()], last_cool_downs[u.getID()], last_actions[u.getID()])
-                                r_m = reward_move(u, last_states[u.getID()], last_actions[u.getID()], last_positions[u.getID()])
+                                r_m = reward_last_action(u, last_actions[u.getID()], last_positions[u.getID()], last_cool_downs[u.getID()])
 
-                                reward = r_a + r_m - 0.1
+                                # r_m = reward_move(u, last_states[u.getID()], last_actions[u.getID()],
+                                #                   last_positions[u.getID()])
+
+                                reward = r_a + r_m
 
                                 if do_train:
-                                    last_nn_state = last_nn_states[u.getID()]
+                                    last_state = last_states[u.getID()]
                                     last_action = last_actions[u.getID()]
-                                    sarsa = [last_nn_state, last_action, reward, nn_state, action, u.getID(), 0]
+
+                                    sarsa = [last_state, last_action, reward, state, action, u.getID(), 0]
                                     self.socket.sendMessage(tag="sarsa", msg=sarsa)
                                     tag, _ = self.socket.receiveMessage()
                                     assert tag == 'train finished'
                                 # agent.train_model(last_state, last_action, reward, state, action)
-
                             last_states[u.getID()] = state
-                            last_nn_states[u.getID()] = nn_state
+                            # if not u.getID() in last_states:
+                            #     last_states[u.getID()] = spatial_state
+                            # else:
+                            #   np.copyto(last_states[u.getID()], spatial_state)
 
                             last_actions[u.getID()] = action
                             last_action_target[u.getID()] = target
@@ -429,22 +429,25 @@ class MultiAgentTrainer:
                         is_first = False
 
                     elif eventtype == cybw.EventType.UnitDestroy:
-                        u = e.getUnit()
-                        if u.getPlayer().getID() == Broodwar.self().getID():
-                            reward = -20
-                            last_nn_state = last_nn_states[u.getID()]
-                            last_action = last_actions[u.getID()]
+                        if do_train:
+                            u = e.getUnit()
+                            if u.getPlayer().getID() == Broodwar.self().getID():
+                                reward = -20
+                                last_state = last_states[u.getID()]
+                                last_action = last_actions[u.getID()]
 
-                            sarsa = [last_nn_state, last_action, reward, last_nn_state, last_action, u.getID(), 1]
-                            self.socket.sendMessage(tag="sarsa", msg=sarsa)
-                            tag, _ = self.socket.receiveMessage()
-                            assert tag == 'train finished'
+                                sarsa = [last_state, last_action, reward, last_state, last_action, u.getID(), 1]
+                                self.socket.sendMessage(tag="sarsa", msg=sarsa)
+                                tag, _ = self.socket.receiveMessage()
+                                assert tag == 'train finished'
 
-                            last_destroyed_own_count += 1
-                        else:
-                            last_destroyed_enemy_count += 1
+                                last_destroyed_own_count += 1
+                            else:
+                                last_destroyed_enemy_count += 1
 
                 if self.visualize:
+                    #self.observation.draw_box()
+                    self.observation.draw_minimap()
                     draw_action(last_actions, last_action_target)
 
                 client.update()
@@ -477,7 +480,8 @@ class MultiAgentTrainer:
 
         if do_test_during_train:
             df = pd.DataFrame(results)
-            df.columns = ['episode','epsilon','winrate','left_unit_avg','left_unit_stdev','score_avg', 'score_stdev']
+            df.columns = ['episode', 'epsilon', 'winrate', 'left_unit_avg', 'left_unit_stdev', 'score_avg',
+                          'score_stdev']
             df.to_csv(self.get_file_name(extend='csv'), index=False)
 
         if self.export_per == -1:

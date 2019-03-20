@@ -8,6 +8,7 @@ from multi_agent.multi_agent_trainer import MultiAgentTrainer
 from simple_agent.archon_test import *
 import time, datetime
 from simple_agent.epsilon_decay import *
+from multi_agent.multi_agent_trainer_map import MultiAgentTrainerCNN
 
 def trainSimpleOne():
     trainer = AgentTrainer(maxIterate=1000, epsilon_decrease="LINEAR", algorithm="Q_LEARNING")
@@ -64,17 +65,19 @@ def train_multi_agent():
 def train_multi_agent2():
     s = socketClient()
     s.accessToServer()
-    trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=3000,
-                                mode='train',map_name='3G_4Z',layers=[100,100],
-                                export_per=1000,last_action_state_also_state=False)
-    trainer.train()
+    trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
+                                mode='train',map_name='3G_6Z',layers=[100, 100],
+                                export_per=500,last_action_state_also_state=False,
+                                eligibility_trace=False)
+
+    trainer.train(do_test_during_train=False)
 
 def train_multi_agent_with_eligibility():
     s = socketClient()
     s.accessToServer()
     trainer = MultiAgentTrainer(s, epsilon_decay=InvSqrtDecay(1.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=5000,
                                 mode='train',map_name='3G_6Z',layers=[100, 100],
-                                export_per=100,last_action_state_also_state=False,
+                                export_per=500,last_action_state_also_state=False,
                                 eligibility_trace=True)
 
     trainer.train(do_test_during_train=False)
@@ -86,17 +89,52 @@ def train_multi_agent_a2c():
     trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='A2C', very_fast=True, visualize = False,
                                 max_iterate=3000,
                                 mode='train',map_name='3G_6Z', actor_layers=[100, 100], critic_layers=[100, 100],
-                                export_per=1000,last_action_state_also_state=False)
+                                export_per=1500,last_action_state_also_state=False)
 
     trainer.train(do_test_during_train=False)
+
+def train_multi_agent_a2c_eligibility():
+    s = socketClient()
+    s.accessToServer()
+    trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='A2C', very_fast=True, visualize = False,
+                                max_iterate=50000,
+                                mode='train',map_name='3G_6Z', actor_layers=[100, 100], critic_layers=[100, 100],
+                                export_per=1000,last_action_state_also_state=False, eligibility_trace=True)
+
+    trainer.train(do_test_during_train=False)
+
+def train_multi_agent_cnn():
+    s = socketClient()
+    s.accessToServer()
+    #LinearDecay(1, 0.05, 2000)
+    trainer = MultiAgentTrainerCNN(s, epsilon_decay=LinearDecay(1.0, 0.02, 1000), algorithm='CNN',
+                                very_fast=True, visualize = False,
+                                max_iterate=2000,
+                                mode='train',map_name='3G_6Z_water',
+                                export_per=500,last_action_state_also_state=False, eligibility_trace=False)
+
+    trainer.train(do_test_during_train=False)
+
+def test_multi_agent_cnn():
+    s = socketClient()
+    s.accessToServer()
+    #LinearDecay(1, 0.05, 2000)
+    trainer = MultiAgentTrainerCNN(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='CNN', very_fast=False, visualize = True,
+                                   file_or_folder_to_load='../modeldata/CNN_3G_6Z_water_2019_03_17_21_42/CNN_3G_6Z_water_4000_times_2019_03_18_16_37.h5',
+                                max_iterate=100,
+                                mode='evaluate',map_name='3G_6Z', last_action_state_also_state=False, eligibility_trace=False)
+
+    trainer.train()
 
 def test_multi_agent():
     s = socketClient()
     s.accessToServer()
     trainer = MultiAgentTrainer(s, epsilon_decay=ConstantEpsilon(0.0), algorithm='DeepSarsa', very_fast=True, visualize = False, max_iterate=100,
-                                file_or_folder_to_load='../modeldata/deep_sarsa_3G_6Z_2019_02_06_00_48/deep_sarsa_3G_6Z_4000_times_2019_02_06_11_31.h5',
+                                file_or_folder_to_load='../modeldata/deep_sarsa_3G_6Z_2019_02_06_23_53/deep_sarsa_3G_6Z_4000_times_2019_02_07_08_54.h5',
                                 mode='evaluate', map_name='3G_6Z', layers=[100,100]
                                 , last_action_state_also_state = False)
+    #trainer.evaluate(100)
+
     trainer.train()
 
 
@@ -134,8 +172,12 @@ if __name__ == "__main__":
     start_time = time.time()
     #test_multi_agent()
     #trainSimpleOne2()
-    #test_multi_agent()
-    train_multi_agent_a2c()
+    # test_multi_agent()
+
+    train_multi_agent_cnn()
+    #test_multi_agent_cnn()
+    #train_multi_agent_with_eligibility()
+
     print(str(datetime.timedelta(seconds=time.time()-start_time)))
     #trainSimpleOne()
     #testSimpleOne()

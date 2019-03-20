@@ -11,6 +11,7 @@ class socketClient:
     def sendMessage(self, tag, msg):
         packet = pickle.dumps([tag, msg])
         self.s.send(packet)
+        #del packet
         #print("SEND",tag,msg)
 
     def receiveMessage(self):
